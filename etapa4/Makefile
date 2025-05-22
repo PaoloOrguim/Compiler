@@ -1,16 +1,20 @@
 # Nome do executável
-EXEC = etapa3
+EXEC = etapa4
+
+# Diretórios
+SRCDIR = src
+INCDIR = headers
 
 # Arquivos-fonte e gerados
-LEX    = scanner.l
-YACC   = parser.y
-HEADERS = asd.h lexical_value.h
-CFILES = main.c parser.tab.c lex.yy.c asd.c
+LEX    = $(SRCDIR)/scanner.l
+YACC   = $(SRCDIR)/parser.y
+HEADERS = $(INCDIR)/asd.h $(INCDIR)/lexical_value.h
+CFILES = $(SRCDIR)/main.c parser.tab.c lex.yy.c $(SRCDIR)/asd.c
 OFILES = main.o parser.tab.o lex.yy.o asd.o
 
 # Compilador e flags
 CC     = gcc
-CFLAGS = -Wall -g -fsanitize=address -I.
+CFLAGS = -Wall -g -fsanitize=address -I$(INCDIR)
 
 # Target padrão
 default: $(EXEC)
@@ -24,17 +28,17 @@ parser.tab.c parser.tab.h: $(YACC) $(HEADERS)
 	bison -d $(YACC)
 
 # Compilação dos arquivos .o
-main.o: main.c parser.tab.h asd.h
-	$(CC) $(CFLAGS) -c main.c
+main.o: $(SRCDIR)/main.c parser.tab.h $(INCDIR)/asd.h
+	$(CC) $(CFLAGS) -c $(SRCDIR)/main.c
 
-parser.tab.o: parser.tab.c asd.h lexical_value.h
+parser.tab.o: parser.tab.c $(INCDIR)/asd.h $(INCDIR)/lexical_value.h
 	$(CC) $(CFLAGS) -c parser.tab.c
 
-lex.yy.o: lex.yy.c parser.tab.h lexical_value.h
+lex.yy.o: lex.yy.c parser.tab.h $(INCDIR)/lexical_value.h
 	$(CC) $(CFLAGS) -c lex.yy.c
 
-asd.o: asd.c asd.h
-	$(CC) $(CFLAGS) -c asd.c
+asd.o: $(SRCDIR)/asd.c $(INCDIR)/asd.h
+	$(CC) $(CFLAGS) -c $(SRCDIR)/asd.c
 
 # Linkagem
 $(EXEC): $(OFILES)
