@@ -8,9 +8,9 @@ INCDIR = headers
 # Arquivos-fonte e gerados
 LEX    = $(SRCDIR)/scanner.l
 YACC   = $(SRCDIR)/parser.y
-HEADERS = $(INCDIR)/asd.h $(INCDIR)/lexical_value.h
-CFILES = $(SRCDIR)/main.c parser.tab.c lex.yy.c $(SRCDIR)/asd.c
-OFILES = main.o parser.tab.o lex.yy.o asd.o
+HEADERS = $(INCDIR)/asd.h $(INCDIR)/lexical_value.h $(INCDIR)/tables.h
+CFILES = $(SRCDIR)/main.c parser.tab.c lex.yy.c $(SRCDIR)/asd.c $(SRCDIR)/tables.c
+OFILES = main.o parser.tab.o lex.yy.o asd.o tables.o
 
 # Compilador e flags
 CC     = gcc
@@ -31,14 +31,17 @@ parser.tab.c parser.tab.h: $(YACC) $(HEADERS)
 main.o: $(SRCDIR)/main.c parser.tab.h $(INCDIR)/asd.h
 	$(CC) $(CFLAGS) -c $(SRCDIR)/main.c
 
-parser.tab.o: parser.tab.c $(INCDIR)/asd.h $(INCDIR)/lexical_value.h
+parser.tab.o: parser.tab.c $(INCDIR)/asd.h $(INCDIR)/lexical_value.h $(INCDIR)/tables.h
 	$(CC) $(CFLAGS) -c parser.tab.c
 
-lex.yy.o: lex.yy.c parser.tab.h $(INCDIR)/lexical_value.h
+lex.yy.o: lex.yy.c parser.tab.h $(INCDIR)/lexical_value.h $(INCDIR)/tables.h
 	$(CC) $(CFLAGS) -c lex.yy.c
 
 asd.o: $(SRCDIR)/asd.c $(INCDIR)/asd.h
 	$(CC) $(CFLAGS) -c $(SRCDIR)/asd.c
+
+tables.o: $(SRCDIR)/tables.c $(INCDIR)/tables.h
+	$(CC) $(CFLAGS) -c $(SRCDIR)/tables.c
 
 # Linkagem
 $(EXEC): $(OFILES)

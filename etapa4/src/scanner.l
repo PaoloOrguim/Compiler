@@ -25,6 +25,7 @@ void set_yylval(int token_type, char* value){
 }
 %}
 
+%option noinput nounput
 %option noyywrap
 %option yylineno
 

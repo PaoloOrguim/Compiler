@@ -3,17 +3,26 @@
     #include <stdlib.h>
     #include <string.h>
     #include "asd.h"
-    //#include "lexical_value.h"    /* struct valor_t */
+    #include "lexical_value.h"    /* struct valor_t */
+    #include "tables.h"          /* entries, table and stack related code */
+    #include "errors.h"          /* error codes */
 
     extern asd_tree_t *arvore;  /* raiz da AST */
+
+    struct table_stack *stack = NULL; // Pilha de tabelas
+    int variable_type = 0; // Tipo da variavel
+
     extern int yylex(void);     /* corrigir erro zoado*/
+
     int get_line_number(void);
+
     void yyerror (const char *mensagem);
-    typedef struct {
-        int    line_number;
-        int    token_type;
-        char  *token_val;
-    } valor_t;
+
+    //typedef struct {
+    //    int    line_number;
+    //    int    token_type;
+    //    char  *token_val;
+    //} valor_t;
 %}
 
 %define parse.error verbose
@@ -33,12 +42,13 @@
 %type<no_ast> init decl_var attribution call_func arg_list return_command
 %type<no_ast> flow_ctrl conditional while expressao
 %type<no_ast> n7 n6 n5 n4 n3 n2 n1 n0
+%type<no_ast> empilha desempilha
 
 %%
 
 programa
-    : /*vazio*/                             { $$ = NULL; arvore = $$; } // Inicio da arvore
-    | lista ';'                             { $$ = $1; arvore = $$; }
+    : /*vazio*/                                                 { $$ = NULL; arvore = $$; } // Inicio da arvore
+    | empilha lista desempilha ';'                              { $$ = $2; arvore = $$; }
     ;
 
 lista
@@ -61,13 +71,13 @@ elemento
     ;
 
 def_func
-    : header TK_PR_IS body                   { // No com a label do header. Body vira filho
-                                        $$ = asd_new($1->label);
-                                        if ($3 != NULL){
-                                            asd_add_child($$, $3);
-                                        }
-                                        asd_free($1);
-                                    }
+    : empilha header TK_PR_IS body desempilha   { // No com a label do header. Body vira filho
+                                                    $$ = asd_new($2->label);
+                                                    if ($4 != NULL){
+                                                        asd_add_child($$, $4);
+                                                    }
+                                                    asd_free($2);
+                                                }
     ;
 
 decl_var_global
@@ -367,6 +377,20 @@ n0
     | call_func                             { $$ = $1; }
     | '(' expressao ')'                     { $$ = $2; }
     ;
+
+empilha:                                    {
+                                                // Criar tabela
+                                                struct table *table = create_table();
+                                                // Colocar tabela na pilha
+                                                push_table_stack(&stack, table);
+                                                $$ = NULL;
+                                            }
+
+desempilha:                                 {
+                                                // Tirar tabela do topo da pilha
+                                                pop_table_stack(&stack);
+                                                $$ = NULL;
+                                            }
 
 %%
 
