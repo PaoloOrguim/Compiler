@@ -6,3 +6,5 @@
 #define ERR_MISSING_ARGS     40 //2.5
 #define ERR_EXCESS_ARGS      41 //2.5
 #define ERR_WRONG_TYPE_ARGS  42 //2.5
+
+#define NO_ERR                0

@@ -7,7 +7,14 @@
     #include "tables.h"          /* entries, table and stack related code */
     #include "errors.h"          /* error codes */
 
+    #define TYPE_INT 0          //substituir pela importação do type.h
+    #define TYPE_FLOAT 1        //substituir pela importação do type.h
+
+    #define PLACEHOLDER 0
+    #define VAR_NATURE 1
+
     extern asd_tree_t *arvore;  /* raiz da AST */
+
 
     struct table_stack *stack = NULL; // Pilha de tabelas
     int variable_type = 0; // Tipo da variavel
@@ -18,11 +25,6 @@
 
     void yyerror (const char *mensagem);
 
-    //typedef struct {
-    //    int    line_number;
-    //    int    token_type;
-    //    char  *token_val;
-    //} valor_t;
 %}
 
 %define parse.error verbose
@@ -42,13 +44,13 @@
 %type<no_ast> init decl_var attribution call_func arg_list return_command
 %type<no_ast> flow_ctrl conditional while expressao
 %type<no_ast> n7 n6 n5 n4 n3 n2 n1 n0
-%type<no_ast> empilha desempilha
+%type<no_ast> push_table pop_table
 
 %%
 
 programa
     : /*vazio*/                                                 { $$ = NULL; arvore = $$; } // Inicio da arvore
-    | empilha lista desempilha ';'                              { $$ = $2; arvore = $$; }
+    | push_table lista pop_table ';'                              { $$ = $2; arvore = $$; }
     ;
 
 lista
@@ -66,13 +68,13 @@ lista
     ;
 
 elemento
-    : def_func                              { $$ = $1; }    // Ambos passados pra cabeca
-    | decl_var_global                       { $$ = $1; }
+    : def_func                             { $$ = $1; }    // Ambos passados pra cabeca
+    | decl_var_global                                            { $$ = $1; }
     ;
 
 def_func
-    : empilha header TK_PR_IS body desempilha   { // No com a label do header. Body vira filho
-                                                    $$ = asd_new($2->label);
+    : push_table header TK_PR_IS body pop_table   { // No com a label do header. Body vira filho
+                                                    $$ = asd_new($2->label, PLACEHOLDER);
                                                     if ($4 != NULL){
                                                         asd_add_child($$, $4);
                                                     }
@@ -82,6 +84,13 @@ def_func
 
 decl_var_global
     : TK_PR_DECLARE TK_ID TK_PR_AS tipo     {   // Pra variavel global cabeca fica nula e libera TK_ID
+                                                struct entry *entry_aux = search_entry_in_stack(stack, $2->token_val);
+                                                if(entry_aux != NULL){
+                                                    exit(ERR_DECLARED);
+                                                }else{
+                                                    entry_aux = create_entry(get_line_number(), VAR_NATURE, variable_type, *$2);
+                                                    add_entry(stack->top, entry_aux);
+                                                }
                                                 $$ = NULL;
                                                 if ($2){
                                                     free($2->token_val);
@@ -100,7 +109,7 @@ header
 
 header_head
     : TK_ID TK_PR_RETURNS tipo              {
-                                                $$ = asd_new($1->token_val);
+                                                $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -109,8 +118,8 @@ header_head
     ;
 
 tipo
-    : TK_PR_FLOAT                           { /*$$ = asd_new("float");*/ }  // Nao precisa de nenhum nome
-    | TK_PR_INT                             { /*$$ = asd_new("int");*/ }
+    : TK_PR_FLOAT                           { $$ = NULL; variable_type = TYPE_FLOAT; }
+    | TK_PR_INT                             { $$ = NULL; variable_type = TYPE_INT; }
     ;
 
 pre_param_list
@@ -135,7 +144,7 @@ param_list
 
 parameter
     : TK_ID TK_PR_AS tipo                   {
-                                                $$ = asd_new($1->token_val);
+                                                $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -148,7 +157,7 @@ body
     ;
 
 command_block
-    : '[' simple_command_list ']'           { $$ = $2; }
+    : '[' push_table simple_command_list pop_table ']'           { $$ = $3; }
     ;
 
 simple_command_list
@@ -175,13 +184,13 @@ simple_command
     ;
 
 init
-    : TK_PR_WITH TK_LI_INT              {  $$ = asd_new($2->token_val); // No com o valor do TK_LI_*
+    : TK_PR_WITH TK_LI_INT              {  $$ = asd_new($2->token_val, PLACEHOLDER); // No com o valor do TK_LI_*
                                             if ($2){
                                                 free($2->token_val);
                                                 free($2);
                                             }
                                         }
-    | TK_PR_WITH TK_LI_FLOAT            {  $$ = asd_new($2->token_val);
+    | TK_PR_WITH TK_LI_FLOAT            {  $$ = asd_new($2->token_val, PLACEHOLDER);
                                             if ($2){
                                                 free($2->token_val);
                                                 free($2);
@@ -194,8 +203,8 @@ decl_var
     : TK_PR_DECLARE TK_ID TK_PR_AS tipo init {
                                                 if($5 != NULL)  //se tiver inicializacao cria no e da os filhos com o valor do ID e da init
                                                 {
-                                                    $$ = asd_new("with");
-                                                    asd_add_child($$, asd_new($2->token_val));
+                                                    $$ = asd_new("with", PLACEHOLDER);
+                                                    asd_add_child($$, asd_new($2->token_val, PLACEHOLDER));
                                                     asd_add_child($$, $5);
                                                 }
                                                 else{ $$ = NULL;}
@@ -205,8 +214,8 @@ decl_var
 
 attribution
     : TK_ID TK_PR_IS expressao              {   // Atribuitcao no is com filhos do valor do TK_ID e a expressao
-                                                $$ = asd_new("is");
-                                                asd_add_child($$, asd_new($1->token_val));
+                                                $$ = asd_new("is", PLACEHOLDER);
+                                                asd_add_child($$, asd_new($1->token_val, PLACEHOLDER));
                                                 asd_add_child($$, $3);
                                                 if($1){
                                                     free($1->token_val);
@@ -219,7 +228,7 @@ call_func
     : TK_ID '(' arg_list ')'                {   // No com o nome da funcao e filho arg_list se houver
                                                 char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
                                                 sprintf(nome_da_funcao, "call %s", $1->token_val);
-                                                $$ = asd_new(nome_da_funcao);
+                                                $$ = asd_new(nome_da_funcao, PLACEHOLDER);
                                                 free(nome_da_funcao);
                                                 asd_add_child($$, $3);
                                                 if($1){
@@ -230,7 +239,7 @@ call_func
     | TK_ID '('  ')'                        {
                                                 char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
                                                 sprintf(nome_da_funcao, "call %s", $1->token_val);
-                                                $$ = asd_new(nome_da_funcao);
+                                                $$ = asd_new(nome_da_funcao, PLACEHOLDER);
                                                 free(nome_da_funcao);
                                                 if($1){
                                                     free($1->token_val);
@@ -259,7 +268,7 @@ arg_list
 
 return_command
     : TK_PR_RETURN expressao TK_PR_AS tipo  {   //No return cujo filho e a expressao
-                                                $$ = asd_new("return");
+                                                $$ = asd_new("return", PLACEHOLDER);
                                                 asd_add_child($$, $2);
                                             }
     ;
@@ -271,7 +280,7 @@ flow_ctrl
 
 conditional
     : TK_PR_IF '(' expressao ')' command_block                              {   // Sem else
-                                                                                $$ = asd_new("if");
+                                                                                $$ = asd_new("if", PLACEHOLDER);
                                                                                 if($3!=NULL){
                                                                                     asd_add_child($$, $3);
                                                                                 }
@@ -281,7 +290,7 @@ conditional
                                                                                 //if ($6) asd_add_child($$, $6);
                                                                             }
     | TK_PR_IF '(' expressao ')' command_block TK_PR_ELSE command_block     {   // Com else command_block vira filho
-                                                                                $$ = asd_new("if");
+                                                                                $$ = asd_new("if", PLACEHOLDER);
                                                                                 if($3!=NULL){
                                                                                     asd_add_child($$, $3);
                                                                                 }
@@ -294,7 +303,7 @@ conditional
 
 while
     : TK_PR_WHILE '(' expressao ')' command_block               {
-                                                                    $$ = asd_new("while");
+                                                                    $$ = asd_new("while", PLACEHOLDER);
                                                                     if($3!=NULL){
                                                                         asd_add_child($$, $3);
                                                                     }
@@ -309,66 +318,66 @@ expressao
     ;
 
 n7
-    : n7 '|' n6                             { $$ = asd_new("|"); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n7 '|' n6                             { $$ = asd_new("|", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n6                                    { $$ = $1; }
     ;
 
 n6
-    : n6 '&' n5                             { $$ = asd_new("&"); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n6 '&' n5                             { $$ = asd_new("&", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n5                                    { $$ = $1; }
     ;
 
 n5
-    : n5 TK_OC_EQ n4                        { $$ = asd_new("=="); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n5 TK_OC_NE n4                        { $$ = asd_new("!="); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n5 TK_OC_EQ n4                        { $$ = asd_new("==", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n5 TK_OC_NE n4                        { $$ = asd_new("!=", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n4                                    { $$ = $1; }
     ;
 
 n4
-    : n4 '<' n3                             { $$ = asd_new("<"); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n4 '>' n3                             { $$ = asd_new(">"); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n4 TK_OC_LE n3                        { $$ = asd_new("<="); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n4 TK_OC_GE n3                        { $$ = asd_new(">="); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n4 '<' n3                             { $$ = asd_new("<", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n4 '>' n3                             { $$ = asd_new(">", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n4 TK_OC_LE n3                        { $$ = asd_new("<=", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n4 TK_OC_GE n3                        { $$ = asd_new(">=", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n3                                    { $$ = $1; }
     ;
 
 n3
-    : n3 '+' n2                             { $$ = asd_new("+"); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n3 '-' n2                             { $$ = asd_new("-"); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n3 '+' n2                             { $$ = asd_new("+", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n3 '-' n2                             { $$ = asd_new("-", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n2                                    { $$ = $1; }
     ;
 
 n2
-    : n2 '*' n1                             { $$ = asd_new("*"); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n2 '/' n1                             { $$ = asd_new("/"); asd_add_child($$, $1); asd_add_child($$, $3); }
-    | n2 '%' n1                             { $$ = asd_new("%"); asd_add_child($$, $1); asd_add_child($$, $3); }
+    : n2 '*' n1                             { $$ = asd_new("*", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n2 '/' n1                             { $$ = asd_new("/", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
+    | n2 '%' n1                             { $$ = asd_new("%", PLACEHOLDER); asd_add_child($$, $1); asd_add_child($$, $3); }
     | n1                                    { $$ = $1; }
     ;
 
 n1
-    : '+' n1                                { $$ = asd_new("+"); asd_add_child($$, $2); }
-    | '-' n1                                { $$ = asd_new("-"); asd_add_child($$, $2); }
-    | '!' n1                                { $$ = asd_new("!"); asd_add_child($$, $2); }
+    : '+' n1                                { $$ = asd_new("+", PLACEHOLDER); asd_add_child($$, $2); }
+    | '-' n1                                { $$ = asd_new("-", PLACEHOLDER); asd_add_child($$, $2); }
+    | '!' n1                                { $$ = asd_new("!", PLACEHOLDER); asd_add_child($$, $2); }
     | n0                                    { $$ = $1; }
     ;
 
 n0
     : TK_ID                                 { 
-                                                $$ = asd_new($1->token_val);
+                                                $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val); 
                                                     free($1);
                                                 }
                                             }
     | TK_LI_INT                             {
-                                                $$ = asd_new($1->token_val);
+                                                $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val); 
                                                     free($1);
                                                 }
                                             }
     | TK_LI_FLOAT                           {
-                                                $$ = asd_new($1->token_val);
+                                                $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val); 
                                                     free($1);
@@ -378,7 +387,7 @@ n0
     | '(' expressao ')'                     { $$ = $2; }
     ;
 
-empilha:                                    {
+push_table:                                    {
                                                 // Criar tabela
                                                 struct table *table = create_table();
                                                 // Colocar tabela na pilha
@@ -386,7 +395,7 @@ empilha:                                    {
                                                 $$ = NULL;
                                             }
 
-desempilha:                                 {
+pop_table:                                 {
                                                 // Tirar tabela do topo da pilha
                                                 pop_table_stack(&stack);
                                                 $$ = NULL;
