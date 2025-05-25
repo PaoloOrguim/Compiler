@@ -15,8 +15,8 @@ struct entry create_entry(int line_number, int nature, int type, valor_t value, 
     new_entry.nature = nature;
     new_entry.type = type;
     new_entry.value = value;
-    new_entry.num_params = 0;
-    new_entry.params = NULL;
+    new_entry.num_params = num_params;
+    new_entry.params = params_list;
     if (nature == NATURE_FUNC && num_params > 0 && params_list != NULL) {
         new_entry.num_params = num_params;
         // Parametros copiados em add_entry
@@ -71,6 +71,8 @@ void add_entry(struct table *table, struct entry *entry_to_add) {
             exit(1);
         }
         memcpy(table->entries[table->total_entries - 1]->params, entry_to_add->params, entry_to_add->num_params * sizeof(struct param_info));
+    } else { // Importante: Se nao houver params, garantir que a copia tambem seja NULL
+        table->entries[table->total_entries - 1]->params = NULL;
     }
 }
 
