@@ -73,7 +73,7 @@ elemento
 
 def_func
     : header TK_PR_IS body pop_table   { // No com a label do header. Body vira filho
-                                                    $$ = asd_new($1->label, PLACEHOLDER);
+                                                    $$ = asd_new($1->label, variable_type);
                                                     if ($3 != NULL){
                                                         asd_add_child($$, $3);
                                                     }
@@ -170,7 +170,7 @@ header_head
                                                     add_entry(stack->top, &e);
                                                     free(v.token_val);
                                                 }
-                                                $$ = asd_new($1->token_val, PLACEHOLDER);
+                                                $$ = asd_new($1->token_val, variable_type);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -211,7 +211,27 @@ param_list
 
 parameter
     : TK_ID TK_PR_AS tipo                   {
-                                                $$ = asd_new($1->token_val, PLACEHOLDER);
+                                                char *pname = $1->token_val;
+                                                if(search_entry(stack->top, pname) != NULL){
+                                                    semantic_error(ERR_DECLARED, "Dois parametros com o mesmo nome.", get_line_number());
+                                                }
+                                                valor_t v;
+                                                v.line_number = get_line_number();
+                                                v.token_type = TK_ID;
+                                                v.token_val = strdup(pname);
+                                                struct entry e = create_entry(
+                                                    get_line_number(),
+                                                    NATURE_VAR,
+                                                    variable_type,
+                                                    v,
+                                                    0,
+                                                    NULL
+                                                );
+                                                add_entry(stack->top, &e);
+                                                free(v.token_val);
+
+
+                                                $$ = asd_new($1->token_val, variable_type);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -273,7 +293,7 @@ decl_var
                                                 if(search_entry(stack->top, varname) != NULL){
                                                     semantic_error(ERR_DECLARED, "Identificador ja declarado neste escopo", get_line_number());
                                                 }
-                                                if (variable_type != $5->type){
+                                                if ($5 != NULL && variable_type != $5->type){
                                                     semantic_error(ERR_WRONG_TYPE, "Tipo de variavel diferente do tipo da inicializacao", get_line_number());
                                                 }
                                                 valor_t v;
@@ -294,8 +314,8 @@ decl_var
 
                                                 if($5 != NULL)  //se tiver inicializacao cria no e da os filhos com o valor do ID e da init
                                                 {
-                                                    $$ = asd_new("with", PLACEHOLDER);
-                                                    asd_add_child($$, asd_new($2->token_val, PLACEHOLDER));
+                                                    $$ = asd_new("with", variable_type);
+                                                    asd_add_child($$, asd_new($2->token_val, variable_type));
                                                     asd_add_child($$, $5);
                                                 }
                                                 else{ $$ = NULL;}
@@ -328,7 +348,7 @@ attribution
 
                                                 // Atribuitcao no is com filhos do valor do TK_ID e a expressao
                                                 $$ = asd_new("is", e->type);
-                                                asd_add_child($$, asd_new($1->token_val, PLACEHOLDER));
+                                                asd_add_child($$, asd_new($1->token_val, variable_type));
                                                 asd_add_child($$, $3);
                                                 if($1){
                                                     free($1->token_val);
@@ -338,106 +358,147 @@ attribution
     ;
 
 call_func
-    : TK_ID '(' arg_list ')'                {   
-                                                char *fname = $1->token_val;
-                                                struct entry *func_entry = search_entry_in_stack(stack, fname);
+    : TK_ID '(' arg_list ')'            {
+                                        char *fname = $1->token_val;
+                                        struct entry *func_entry = search_entry_in_stack(stack, fname);
 
-                                                if (func_entry == NULL) {
-                                                    semantic_error(ERR_UNDECLARED, "Identificador nao declarado", $1->line_number);
-                                                    $$ = asd_new("call", PLACEHOLDER);
-                                                    if ($3 != NULL) asd_add_child($$, $3); // Adiciona os argumentos mesmo com erro
-                                                } else if (func_entry->nature == NATURE_VAR) {
-                                                    semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
-                                                    $$ = asd_new("call", PLACEHOLDER);
-                                                    if ($3 != NULL) asd_add_child($$, $3);
-                                                } else {
-                                                    int declared_param_count = func_entry->num_params;
-                                                    // O nó $3 agora é o primeiro argumento da lista (se a regra arg_list foi mudada para recursiva à esquerda)
-                                                    // Ou é o nó "arg_list_head" se a regra arg_list foi mudada para a primeira sugestão.
-                                                    // Considerando a segunda sugestão para arg_list (recursiva à esquerda):
-                                                    asd_tree_t *first_arg_node = $3;
-                                                    int actual_arg_count = 0;
+                                        // Placeholder for the AST node for the call, to be created even on errors
+                                        asd_tree_t *call_node = NULL;
 
-                                                    // Itera pelos argumentos passados (o primeiro e seus filhos)
-                                                    // Se houver $3, ele é o primeiro argumento. Seus filhos são os restantes.
-                                                    if (first_arg_node != NULL) {
-                                                        actual_arg_count = 1; // Contamos o primeiro argumento
-                                                        // Verifica o tipo do primeiro argumento
-                                                        if (actual_arg_count <= declared_param_count && func_entry->params != NULL) {
-                                                            if (first_arg_node->type != func_entry->params[actual_arg_count - 1].type) {
+                                        if (func_entry == NULL) {
+                                            semantic_error(ERR_UNDECLARED, "Identificador nao declarado", $1->line_number);
+                                        } else if (func_entry->nature == NATURE_VAR) {
+                                            semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
+                                        } else { // It's a declared function, now check arguments
+                                            int declared_param_count = func_entry->num_params;
+                                            asd_tree_t *first_arg_node = $3; // This is the AST node representing the first argument (or the list head)
+
+                                            int actual_arg_count = 0;
+
+                                            if (first_arg_node != NULL) { // Check if there's at least one argument parsed
+                                                actual_arg_count = 1; // Count the first argument
+                                                // Perform type check for the first argument
+                                                if (actual_arg_count <= declared_param_count && func_entry->params != NULL) {
+                                                    if (first_arg_node->type != func_entry->params[actual_arg_count - 1].type) {
+                                                        semantic_error(ERR_WRONG_TYPE_ARGS, "Tipo de argumento incompativel na chamada da funcao", $1->line_number);
+                                                    }
+                                                }
+
+                                                // Iterate through the children (subsequent arguments)
+                                                // **CRITICAL: Add a null check for first_arg_node before accessing number_of_children**
+                                                // Although you already have `if (first_arg_node != NULL)`, this internal loop should be careful.
+                                                // The error trace points to line 276, which is `asd_tree_t *first_arg_node = $3;`.
+                                                // This suggests $3 itself might be NULL. The check `if (first_arg_node != NULL)` happens *after* assignment.
+                                                // The problem might be in the first_arg_node->children[i] or first_arg_node->number_of_children if first_arg_node is indeed NULL.
+                                                // This `for` loop will only execute if `first_arg_node` is not null, so the issue is probably
+                                                // when `first_arg_node` is indeed null, and then `actual_arg_count` remains 0,
+                                                // leading to `ERR_MISSING_ARGS` if `declared_param_count > 0`.
+                                                // Let's assume the SEGV points to the line where `first_arg_node` is *used* when it's null,
+                                                // not necessarily its assignment.
+                                                
+                                                // The most likely culprit is the `for` loop if `first_arg_node` is NULL.
+                                                // The previous check `if (first_arg_node != NULL)` should handle it.
+                                                // Let's re-evaluate the flow for the `arg_list` rule.
+                                                // If `arg_list` can return NULL when it's expected to be a valid AST node.
+
+                                                // Assuming $3 is properly handled by the grammar, the issue may be if `number_of_children` is garbage
+                                                // if `asd_new` failed or a node was corrupted. But AddressSanitizer points to `0x18`, which
+                                                // strongly suggests `NULL + offset`.
+
+                                                // Re-confirming: the only way `first_arg_node->number_of_children` leads to 0x18
+                                                // is if `first_arg_node` is NULL. The `if (first_arg_node != NULL)` check should prevent this.
+                                                // IS IT POSSIBLE that `first_arg_node` itself is not fully constructed or partially corrupted?
+                                                // Or is the error message `src/parser.y:276` misleading and it's actually in the loop *after* the if statement?
+
+                                                // Let's make the loop even safer:
+                                                if (first_arg_node->number_of_children > 0) { // Check before iterating through children
+                                                    for (int i = 0; i < first_arg_node->number_of_children; i++) {
+                                                        asd_tree_t *current_arg_node = first_arg_node->children[i];
+                                                        if (current_arg_node == NULL) { // Extra check for null children
+                                                            semantic_error(ERR_WRONG_TYPE_ARGS, "Argumento nulo inesperado na chamada da funcao", $1->line_number);
+                                                            break;
+                                                        }
+                                                        actual_arg_count++;
+
+                                                        if (actual_arg_count > declared_param_count) {
+                                                            semantic_error(ERR_EXCESS_ARGS, "Numero excessivo de argumentos na chamada da funcao", $1->line_number);
+                                                            break;
+                                                        }
+                                                        if (func_entry->params != NULL && (actual_arg_count - 1) < declared_param_count) {
+                                                            if (current_arg_node->type != func_entry->params[actual_arg_count - 1].type) {
                                                                 semantic_error(ERR_WRONG_TYPE_ARGS, "Tipo de argumento incompativel na chamada da funcao", $1->line_number);
                                                             }
                                                         }
-
-                                                        // Itera pelos filhos (os argumentos subsequentes)
-                                                        for (int i = 0; i < first_arg_node->number_of_children; i++) {
-                                                            actual_arg_count++;
-                                                            asd_tree_t *current_arg_node = first_arg_node->children[i];
-
-                                                            // Verifica numero excessivo de argumentos
-                                                            if (actual_arg_count > declared_param_count) {
-                                                                semantic_error(ERR_EXCESS_ARGS, "Numero excessivo de argumentos na chamada da funcao", $1->line_number);
-                                                                break; // Já encontramos um erro de excesso, podemos parar de verificar tipos aqui
-                                                            }
-
-                                                            // Verifica compatibilidade de tipo dos argumentos
-                                                            if (func_entry->params != NULL && (actual_arg_count - 1) < declared_param_count) {
-                                                                if (current_arg_node->type != func_entry->params[actual_arg_count - 1].type) {
-                                                                    semantic_error(ERR_WRONG_TYPE_ARGS, "Tipo de argumento incompativel na chamada da funcao", $1->line_number);
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-
-                                                    // Verifica se faltam argumentos
-                                                    if (actual_arg_count < declared_param_count) {
-                                                        semantic_error(ERR_MISSING_ARGS, "Numero insuficiente de argumentos na chamada da funcao", $1->line_number);
-                                                    }
-
-                                                    // Cria o nó AST para a chamada da função
-                                                    char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
-                                                    sprintf(nome_da_funcao, "call %s", $1->token_val);
-                                                    $$ = asd_new(nome_da_funcao, func_entry->type);
-                                                    free(nome_da_funcao);
-                                                    if ($3 != NULL) asd_add_child($$, $3); // Anexa a lista de argumentos como filho
-                                                }
-                                                if ($1) {
-                                                    free($1->token_val);
-                                                    free($1);
-                                                }
-                                            }
-    | TK_ID '('  ')'                        {
-                                                {
-                                                    char *fname = $1->token_val;
-                                                    struct entry *func_entry = search_entry_in_stack(stack, fname);
-
-                                                    if (func_entry == NULL) {
-                                                        semantic_error(ERR_UNDECLARED, "Identificador nao declarado", $1->line_number);
-                                                        $$ = asd_new("call", PLACEHOLDER);
-                                                    } else if (func_entry->nature == NATURE_VAR) {
-                                                        semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
-                                                        $$ = asd_new("call", PLACEHOLDER);
-                                                    } else {
-                                                        // Nenhuma arg_list foi fornecida, entao actual_arg_count é 0
-                                                        int declared_param_count = func_entry->num_params;
-
-                                                        // Verifica se faltam argumentos (se a funcao espera algum)
-                                                        if (declared_param_count > 0) {
-                                                            semantic_error(ERR_MISSING_ARGS, "Numero insuficiente de argumentos na chamada da funcao (esperado mais de 0, recebido 0)", $1->line_number);
-                                                        }
-
-                                                        char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
-                                                        sprintf(nome_da_funcao, "call %s", $1->token_val);
-                                                        $$ = asd_new(nome_da_funcao, func_entry->type);
-                                                        free(nome_da_funcao);
-                                                    }
-                                                    if ($1) {
-                                                        free($1->token_val);
-                                                        free($1);
                                                     }
                                                 }
                                             }
+
+                                            // Check for missing arguments
+                                            if (actual_arg_count < declared_param_count) {
+                                                semantic_error(ERR_MISSING_ARGS, "Numero insuficiente de argumentos na chamada da funcao", $1->line_number);
+                                            }
+
+                                            // Create the AST node for the function call
+                                            char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
+                                            if (nome_da_funcao != NULL) { // Safety check for malloc
+                                                sprintf(nome_da_funcao, "call %s", $1->token_val);
+                                                call_node = asd_new(nome_da_funcao, func_entry->type);
+                                                free(nome_da_funcao);
+                                            } else {
+                                                fprintf(stderr, "Erro de alocacao de memoria para nome da funcao.\n");
+                                                call_node = asd_new("call_error", variable_type); // Fallback
+                                            }
+                                        }
+
+                                        // Attach arguments to the function call node, if it exists
+                                        if (call_node != NULL && $3 != NULL) {
+                                            asd_add_child(call_node, $3);
+                                        }
+
+                                        $$ = call_node; // Assign the created node to $$
+                                        
+                                        // Free the lexical value for TK_ID
+                                        if ($1) {
+                                            free($1->token_val);
+                                            free($1);
+                                        }
+                                    }
+    | TK_ID '(' ')'                     {
+                                        // ... (this rule also needs to be reviewed for similar null pointer risks)
+                                        // The proposed code for this rule seems less prone to this specific SEGV
+                                        // because it doesn't iterate over children.
+                                        char *fname = $1->token_val;
+                                        struct entry *func_entry = search_entry_in_stack(stack, fname);
+                                        asd_tree_t *call_node_empty = NULL; // New node for this rule
+
+                                        if (func_entry == NULL) {
+                                            semantic_error(ERR_UNDECLARED, "Identificador nao declarado", $1->line_number);
+                                            call_node_empty = asd_new("call", variable_type);
+                                        } else if (func_entry->nature == NATURE_VAR) {
+                                            semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
+                                            call_node_empty = asd_new("call", variable_type);
+                                        } else {
+                                            int declared_param_count = func_entry->num_params;
+                                            if (declared_param_count > 0) {
+                                                semantic_error(ERR_MISSING_ARGS, "Numero insuficiente de argumentos na chamada da funcao (esperado mais de 0, recebido 0)", $1->line_number);
+                                            }
+
+                                            char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
+                                            if (nome_da_funcao != NULL) { // Safety check for malloc
+                                                sprintf(nome_da_funcao, "call %s", $1->token_val);
+                                                call_node_empty = asd_new(nome_da_funcao, func_entry->type);
+                                                free(nome_da_funcao);
+                                            } else {
+                                                fprintf(stderr, "Erro de alocacao de memoria para nome da funcao (vazio).\n");
+                                                call_node_empty = asd_new("call_error", variable_type); // Fallback
+                                            }
+                                        }
+                                        $$ = call_node_empty; // Assign the created node
+                                        if ($1) {
+                                            free($1->token_val);
+                                            free($1);
+                                        }
+                                    }
     ;
 
 //optional_arg_list

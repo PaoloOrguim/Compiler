@@ -1,0 +1,12 @@
+foo returns float with var as int is [
+    var is 5
+    declare temp as int
+    temp is var
+    declare temp2 as int with 2
+],
+
+main returns int is [
+    declare var as float with 5.0
+    declare vara as float
+    vara is foo(24)
+];
