@@ -68,7 +68,10 @@ elemento
     ;
 
 def_func
-    : header TK_PR_IS body pop_table   { // No com a label do header. Body vira filho
+    : header TK_PR_IS body pop_table            {   // Escopo é criado antes da lista de parâmetros
+                                                    // para que eles estejam englobados no escopo da função
+
+                                                    // No com a label do header. Body vira filho
                                                     $$ = asd_new($1->label, PLACEHOLDER);
                                                     if ($3 != NULL){
                                                         asd_add_child($$, $3);
@@ -179,6 +182,26 @@ param_list
 
 parameter
     : TK_ID TK_PR_AS tipo                   {
+                                                char *pname = $1->token_val;
+                                                if(search_entry(stack->top, pname) != NULL){
+                                                    semantic_error(ERR_DECLARED, "Dois parametros com o mesmo nome.", get_line_number());
+                                                }
+                                                valor_t v;
+                                                v.line_number = get_line_number();
+                                                v.token_type = TK_ID;
+                                                v.token_val = strdup(pname);
+                                                struct entry e = create_entry(
+                                                    get_line_number(),
+                                                    NATURE_VAR,
+                                                    variable_type,
+                                                    v,
+                                                    0,
+                                                    NULL
+                                                );
+                                                add_entry(stack->top, &e);
+                                                free(v.token_val);
+
+
                                                 $$ = asd_new($1->token_val, PLACEHOLDER);
                                                 if($1){
                                                     free($1->token_val);
@@ -192,12 +215,12 @@ body
     ;
 
 command_block
-    : '[' push_table simple_command_list pop_table ']'           { $$ = $3; }
+    : '[' simple_command_list ']'           { $$ = $2; }
     ;
 
 simple_command_list
     : /*nothingness*/                        { $$ = NULL; }
-    | simple_command simple_command_list    { // Logica para cabeca e simple_command_list virar filho
+    | simple_command simple_command_list    {   // Logica para cabeca e simple_command_list virar filho
                                                 if($1 == NULL){
                                                     $$ = $2;
                                                 }else if($2 == NULL){
@@ -210,7 +233,7 @@ simple_command_list
     ;
 
 simple_command
-    : command_block                         { $$ = $1; }
+    : push_table command_block pop_table                         { $$ = $2; /* Para cada command_block novo, ha um escopo novo */ }
     | decl_var                              { $$ = $1; }
     | attribution                           { $$ = $1; }
     | call_func                             { $$ = $1; }
@@ -239,9 +262,9 @@ decl_var
                                                 char *varname = $2->token_val;
                                                 // Verificar se a variavel ja foi declarada no escopo atual
                                                 if(search_entry(stack->top, varname) != NULL){
-                                                    semantic_error(ERR_DECLARED, "Identificador ja declarado neste escopo", get_line_number());
+                                                    semantic_error(ERR_DECLARED, "Identificador ja declarado neste escopo", $2->line_number);
                                                 }
-                                                if (variable_type != $5->type){
+                                                if ($5 != NULL && variable_type != $5->type){
                                                     semantic_error(ERR_WRONG_TYPE, "Tipo de variavel diferente do tipo da inicializacao", get_line_number());
                                                 }
                                                 valor_t v;
@@ -390,45 +413,47 @@ flow_ctrl
     ;
 
 conditional
-    : TK_PR_IF '(' expressao ')' command_block                              {   // Sem else
+    : TK_PR_IF '(' expressao ')' push_table command_block pop_table         {   // Sem else
                                                                                 $$ = asd_new("if", $3->type);
                                                                                 if($3!=NULL){
                                                                                     asd_add_child($$, $3);
                                                                                 }
-                                                                                if($5 != NULL){
-                                                                                    asd_add_child($$, $5); 
+                                                                                if($6 != NULL){
+                                                                                    asd_add_child($$, $6); 
                                                                                 }
                                                                                 //if ($6) asd_add_child($$, $6);
                                                                             }
-    | TK_PR_IF '(' expressao ')' command_block TK_PR_ELSE command_block     {   
-                                                                                // Tipo dos dois blocos deve ser igual
-                                                                                // Se forem diferentes, ERR_WRONG_TYPE
-                                                                                if($5->type != $7->type){
-                                                                                    semantic_error(ERR_WRONG_TYPE, "Erro: tipo do bloco 'if' diferente do bloco 'else'", get_line_number());
-                                                                                }
-        
-        
-        
-                                                                                // Com else command_block vira filho
-                                                                                $$ = asd_new("if", $3->type);
-                                                                                if($3!=NULL){
-                                                                                    asd_add_child($$, $3);
-                                                                                }
-                                                                                if($5 != NULL){
-                                                                                    asd_add_child($$, $5); 
-                                                                                }
-                                                                                if ($7 != NULL) asd_add_child($$, $7);
-                                                                            }
+    | TK_PR_IF '(' expressao ')' push_table command_block pop_table TK_PR_ELSE push_table command_block pop_table     {
+                                                                                                                        // Tipo dos dois blocos deve ser igual
+                                                                                                                        // Se forem diferentes, ERR_WRONG_TYPE
+                                                                                                                        // Se um for nulo, não precisamos checar os tipos
+                                                                                                                        if($6 == NULL || $10 == NULL){
+                                                                                                                        } else{
+                                                                                                                            if($6->type != $10->type){
+                                                                                                                                semantic_error(ERR_WRONG_TYPE, "Erro: tipo do bloco 'if' diferente do bloco 'else'", get_line_number());
+                                                                                                                            }
+                                                                                                                        }
+                                                
+                                                                                                                        // Com else command_block vira filho
+                                                                                                                        $$ = asd_new("if", $3->type);
+                                                                                                                        if($3!=NULL){
+                                                                                                                            asd_add_child($$, $3);
+                                                                                                                        }
+                                                                                                                        if($6 != NULL){
+                                                                                                                            asd_add_child($$, $6); 
+                                                                                                                        }
+                                                                                                                        if ($10 != NULL) asd_add_child($$, $10);
+                                                                                                                    }
     ;
 
 while
-    : TK_PR_WHILE '(' expressao ')' command_block               {
+    : TK_PR_WHILE '(' expressao ')' push_table command_block pop_table               {
                                                                     $$ = asd_new("while", $3->type);
                                                                     if($3!=NULL){
                                                                         asd_add_child($$, $3);
                                                                     }
-                                                                    if($5 != NULL){
-                                                                        asd_add_child($$, $5); 
+                                                                    if($6 != NULL){
+                                                                        asd_add_child($$, $6); 
                                                                     }
                                                                 }
     ;

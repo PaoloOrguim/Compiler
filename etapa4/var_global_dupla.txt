@@ -1,0 +1,14 @@
+foo returns int with var as int, param as float is [
+    [
+        declare var as int
+    ]
+    declare temp as int
+    while(var == var)[
+        declare temp as int
+    ]
+    if (var == var) [
+        declare temp as float with 0.0
+    ]
+],
+main returns int is [
+];
