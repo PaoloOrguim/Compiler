@@ -14,6 +14,9 @@
     struct table_stack *stack = NULL; // Pilha de tabelas
     int variable_type = 0; // Tipo da variavel
     int function_type = 0; // Tipo da funcao
+    static struct entry *current_func_entry_for_params = NULL;
+    int arg_list_count = 0; // Contador de argumentos da funcao sendo chamada
+    int temp_params[128] = {0};
 
     extern int yylex(void);     /* corrigir erro zoado*/
 
@@ -34,8 +37,8 @@
 %token <lex_val> TK_ID TK_LI_INT TK_LI_FLOAT
 %token TK_ER
 
-%type<no_ast> programa lista elemento def_func decl_var_global header tipo header_head pre_param_list
-%type<no_ast> param_list parameter body command_block simple_command_list simple_command
+%type<no_ast> programa lista elemento def_func decl_var_global header tipo header_head
+%type<no_ast> pre_param_list param_list parameter body command_block simple_command_list simple_command
 %type<no_ast> init decl_var attribution call_func arg_list return_command
 %type<no_ast> flow_ctrl conditional while expressao
 %type<no_ast> n7 n6 n5 n4 n3 n2 n1 n0
@@ -72,7 +75,7 @@ def_func
                                                     // para que eles estejam englobados no escopo da função
 
                                                     // No com a label do header. Body vira filho
-                                                    $$ = asd_new($1->label, PLACEHOLDER);
+                                                    $$ = asd_new($1->label, function_type);
                                                     if ($3 != NULL){
                                                         asd_add_child($$, $3);
                                                     }
@@ -122,7 +125,7 @@ header
     ; 
 
 header_head
-    : TK_ID TK_PR_RETURNS tipo_funcao              {
+    : TK_ID TK_PR_RETURNS tipo_funcao       {
                                                 char *fname = $1->token_val;
                                                 if (search_entry(stack->top, fname) != NULL){
                                                     semantic_error(ERR_DECLARED, "Identificador ja declarado neste escopo", get_line_number());
@@ -142,7 +145,8 @@ header_head
                                                     add_entry(stack->top, &e);
                                                     free(v.token_val);
                                                 }
-                                                $$ = asd_new($1->token_val, PLACEHOLDER);
+                                                current_func_entry_for_params = search_entry(stack->top, fname); // Variavel tem a entrada da funcao atual
+                                                $$ = asd_new($1->token_val, function_type);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -201,8 +205,14 @@ parameter
                                                 add_entry(stack->top, &e);
                                                 free(v.token_val);
 
+                                                struct entry *fe = current_func_entry_for_params;
+                                                fe->num_params++;
+                                                fe->params = realloc(fe->params, fe->num_params * sizeof *fe->params);
+                                                if (!fe->params) exit(1);
+                                                fe->params[ fe->num_params - 1 ].type = variable_type;
 
-                                                $$ = asd_new($1->token_val, PLACEHOLDER);
+
+                                                $$ = asd_new($1->token_val, variable_type);
                                                 if($1){
                                                     free($1->token_val);
                                                     free($1);
@@ -285,8 +295,8 @@ decl_var
 
                                                 if($5 != NULL)  //se tiver inicializacao cria no e da os filhos com o valor do ID e da init
                                                 {
-                                                    $$ = asd_new("with", PLACEHOLDER);
-                                                    asd_add_child($$, asd_new($2->token_val, PLACEHOLDER));
+                                                    $$ = asd_new("with", variable_type);
+                                                    asd_add_child($$, asd_new($2->token_val, variable_type));
                                                     asd_add_child($$, $5);
                                                 }
                                                 else{ $$ = NULL;}
@@ -319,7 +329,7 @@ attribution
 
                                                 // Atribuitcao no is com filhos do valor do TK_ID e a expressao
                                                 $$ = asd_new("is", e->type);
-                                                asd_add_child($$, asd_new($1->token_val, PLACEHOLDER));
+                                                asd_add_child($$, asd_new($1->token_val, variable_type));
                                                 asd_add_child($$, $3);
                                                 if($1){
                                                     free($1->token_val);
@@ -338,7 +348,28 @@ call_func
                                                 }
                                                 if(e->nature == NATURE_VAR){
                                                     semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
-                                                } 
+                                                }
+                                                if (e->num_params < arg_list_count){
+                                                    semantic_error(ERR_EXCESS_ARGS, "Erro: chamada de funcao com excesso de parametros.", $1->line_number);
+                                                }
+                                                if (e->num_params > arg_list_count){
+                                                    semantic_error(ERR_MISSING_ARGS, "Erro: chamada de funcao faltando parametros.", $1->line_number);
+                                                }
+                                                // Verificar se os tipos dos parametros sao iguais
+                                                for (int i = 0; i < e->num_params; i++) {
+                                                    //fprintf(stderr, "Comparando tipo do parametro %d: %d com %d\n", i, e->params[i].type, temp_params[e->num_params - i - 1]);
+                                                    if (e->params[i].type != temp_params[e->num_params - i - 1]) {
+                                                        semantic_error(ERR_WRONG_TYPE_ARGS, "Erro: tipo de parametro passado diferente do tipo do parametro da funcao", $1->line_number);
+                                                    }
+                                                }
+
+                                                
+                                                
+                                                // Zerar para futuro uso
+                                                for (int i = 0; i < 32; i++) {
+                                                    temp_params[i] = 0;
+                                                }
+                                                arg_list_count = 0;
 
                                                 // No com o nome da funcao e filho arg_list se houver
                                                 char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
@@ -360,6 +391,9 @@ call_func
                                                 if(e->nature == NATURE_VAR){
                                                     semantic_error(ERR_VARIABLE, "Erro: variavel sendo usada como funcao", $1->line_number);
                                                 }
+                                                if (e->num_params > 0){
+                                                    semantic_error(ERR_MISSING_ARGS, "Erro: chamada de funcao faltando parametros", $1->line_number);
+                                                }
 
                                                 char *nome_da_funcao = malloc(strlen($1->token_val) + 6);
                                                 sprintf(nome_da_funcao, "call %s", $1->token_val);
@@ -372,14 +406,19 @@ call_func
                                             }
     ;
 
-//optional_arg_list
-//    : /*vazio*/                             { $$ = NULL; }
-//    | arg_list                              { $$ = $1; }
-//    ;
-
 arg_list
-    : expressao                             { $$ = $1; }
+    : expressao                             {
+                                                temp_params[arg_list_count] = $1->type;
+                                                arg_list_count++;
+
+
+
+                                                $$ = $1;
+                                            }
     | expressao ',' arg_list                {
+                                                temp_params[arg_list_count] = $1->type;
+                                                arg_list_count++;
+
                                                 if($3==NULL)
                                                 {
                                                     $$ = $1;

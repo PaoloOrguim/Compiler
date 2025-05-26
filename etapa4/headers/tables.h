@@ -10,7 +10,6 @@
 #define TYPE_UNDEFINED 0 
 #define TYPE_INT       1
 #define TYPE_FLOAT     2
-#define TYPE_BOOL      3 // For results of comparisons, conditions
 
 // Para parametros de funcoes
 struct param_info{
