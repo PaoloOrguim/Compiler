@@ -1,6 +1,8 @@
 #ifndef _ASD_H_
 #define _ASD_H_
 
+#include "iloc.h" // Include the ILOC header
+
 typedef struct asd_tree {
   char *label;
   int number_of_children;
@@ -8,8 +10,8 @@ typedef struct asd_tree {
   int type;
 
   // Etapa5
-  iloc_list_t *code;
-  char *temp;
+  iloc_list_t *code; // Pointer to the ILOC code generated for this node
+  char *temp;        // Temporary register name holding the result of this node's computation
 } asd_tree_t;
 
 /*

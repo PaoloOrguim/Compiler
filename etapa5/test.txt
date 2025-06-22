@@ -1,0 +1,9 @@
+declare global as int,
+declare global2 as int,
+main returns int is [
+    global is !2
+    global2 is 10+(4*1)/3
+    while (global < 3)[
+        global is global+1
+    ]
+];

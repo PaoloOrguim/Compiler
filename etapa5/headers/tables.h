@@ -19,7 +19,9 @@ struct param_info{
 
 // Entradas
 struct entry{
-    int line_number;
+    int line_number; // Para mensagens de erro
+    int offset;      // Deslocamento de memória
+    int is_global;   // Flag para identificar variável global
     int nature;
     int type;
     valor_t value;
@@ -32,6 +34,7 @@ struct entry{
 // Tabelas, com numero total de entradas e ponteiro para as entradas
 struct table{
     int total_entries;
+    int current_offset; // Mantém o próximo deslocamento de memória disponível
     struct entry **entries;
 };
 
@@ -44,7 +47,7 @@ struct table_stack{
 // Funções para manipular entradas e tabelas
 
 // Cria uma nova entrada
-struct entry create_entry(int line_number, int nature, int type, valor_t value, int num_params, struct param_info *params);
+struct entry create_entry(int line_number, int offset, int is_global, int nature, int type, valor_t value, int num_params, struct param_info *params);
 
 // Cria uma nova tabela
 // Adiciona uma entrada a tabela

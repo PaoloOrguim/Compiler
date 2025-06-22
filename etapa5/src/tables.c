@@ -9,9 +9,11 @@
 #include <string.h>
 
 // Criar uma nova entrada
-struct entry create_entry(int line_number, int nature, int type, valor_t value, int num_params, struct param_info *params_list) {
+struct entry create_entry(int line_number, int offset, int is_global, int nature, int type, valor_t value, int num_params, struct param_info *params_list) {
     struct entry new_entry;
     new_entry.line_number = line_number;
+    new_entry.offset = offset;
+    new_entry.is_global = is_global; // Define a flag global
     new_entry.nature = nature;
     new_entry.type = type;
     new_entry.value = value;
@@ -30,6 +32,7 @@ struct table *create_table() {
     if(new_table != NULL) {
         new_table->total_entries = 0;
         new_table->entries = NULL;
+        new_table->current_offset = 4; // Começa o deslocamento com 4 bytes (alinhamento)
     }
     return new_table;
 }
@@ -150,7 +153,7 @@ void push_table_stack(struct table_stack **stack, struct table *table) {
         exit(1);
     }
     new_node->top = table; // The new table becomes the top of the new node
-    new_node->next = *stack; // The old stack becomes the next for the new node
+    new_node->next = *stack; // The old stack becomes the current for the new node
     *stack = new_node; // The new node becomes the current stack
 }
 

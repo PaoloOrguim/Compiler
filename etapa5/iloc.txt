@@ -1,0 +1,15 @@
+main: nop // Function entry
+loadI 2 => r0 // Load integer literal
+storeAI r0 => rbss, 4 // Store value for global
+L0: nop // While loop start (condition check)
+loadAI rbss, 4 => r1 // Load value of global
+loadI 3 => r2 // Load integer literal
+cmp_LT r1, r2 => r3 // Less than comparison
+cbr r3 -> L1, L2 // Conditional branch (while loop)
+L1: nop // While loop body start
+loadAI rbss, 4 => r4 // Load value of global
+loadI 1 => r5 // Load integer literal
+add r4, r5 => r6 // Addition
+storeAI r6 => rbss, 4 // Store value for global
+jumpI -> L0 // Jump back to loop start
+L2: nop // While loop end
