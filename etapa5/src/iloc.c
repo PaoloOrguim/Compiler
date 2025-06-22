@@ -115,16 +115,22 @@ void iloc_list_add(iloc_list_t *list, iloc_op_t *op) {
 
 void iloc_list_concat(iloc_list_t *list1, iloc_list_t *list2) {
     if (list1 == NULL || list2 == NULL) return;
-    if (list2->head == NULL) return; // Nothing to concatenate from list2
 
-    if (list1->head == NULL) {
-        list1->head = list2->head;
-        list1->tail = list2->tail;
-    } else {
-        list1->tail->next = list2->head;
-        list1->tail = list2->tail;
+    // If list2 is not empty, append its operations to list1
+    if (list2->head != NULL) {
+        if (list1->head == NULL) {
+            // list1 was empty, it now becomes list2
+            list1->head = list2->head;
+            list1->tail = list2->tail;
+        } else {
+            // Append list2 to list1
+            list1->tail->next = list2->head;
+            list1->tail = list2->tail;
+        }
     }
-    // list2's internal pointers are now part of list1, just free the list2 container
+    
+    // Always free the container of list2, as its contents are now owned by list1.
+    // This fixes the leak for empty lists.
     free(list2);
 }
 

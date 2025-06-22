@@ -195,6 +195,8 @@ pre_param_list
     : TK_PR_WITH param_list                         {
                                                         if($2 != NULL){
                                                             $$ = $2;
+                                                        } else {
+                                                            $$ = NULL;
                                                         }
                                                     }
 
@@ -244,12 +246,10 @@ parameter
                                                         if (!fe->params) exit(1);
                                                         fe->params[ fe->num_params - 1 ].type = variable_type;
 
+                                                        // CORREÇÃO: Removida a geração de código daqui.
                                                         $$ = asd_new($1->token_val, variable_type);
-                                                        $$->code = iloc_list_new();
-                                                        char *param_temp = iloc_new_reg_temp();
-                                                        iloc_op_t *load_param_op = iloc_op_new("loadAI", iloc_operand_new_reg("rfp"), iloc_operand_new_const(e.offset), iloc_operand_new_reg(param_temp), NULL, NULL, "Load parameter to temp");
-                                                        iloc_list_add($$->code, load_param_op);
-                                                        $$->temp = param_temp;
+                                                        $$->code = iloc_list_new(); // Cria uma lista vazia
+                                                        $$->temp = NULL;            // Nenhum registrador temporário é criado
 
                                                         if($1){
                                                             free($1->token_val);
