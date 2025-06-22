@@ -1,6 +1,0 @@
-fatorial returns int with a as int, b as int is
-[
-    a is 7
-    declare c as int with 7
-    b is 15
-];
