@@ -1,0 +1,26 @@
+declare tempx as int,
+foo returns int with var as int, bvar as int is [
+    declare temp0 as int
+    declare temp as int with 0
+    temp is temp + var * bvar
+    if (temp == var * bvar) [
+        temp is temp + 1
+    ] else [
+        temp is temp * (-1)
+    ]
+    return temp as int
+],
+main returns int is [
+    declare var as int with 0
+    declare mine as int with 5
+    var is var + 5
+    while (var > 0) [
+        mine is var * (mine - var) * 2
+        var is var - 3
+        var is +3 * var --4
+        var is !var - +3
+        var is var <= mine
+        var is var
+    ]
+    return var as int
+];

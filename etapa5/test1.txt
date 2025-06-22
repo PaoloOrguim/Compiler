@@ -1,0 +1,5 @@
+declare global1 as int,
+declare global as int,
+main returns int is[
+    global is 5
+];

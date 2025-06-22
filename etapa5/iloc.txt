@@ -1,0 +1,3 @@
+main: nop // Function entry
+loadI 5 => r0 // Load integer literal
+storeAI r0 => rbss, 8 // Store value for global
