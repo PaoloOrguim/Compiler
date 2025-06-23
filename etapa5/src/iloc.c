@@ -6,6 +6,7 @@
 static int label_counter = 0;
 static int reg_temp_counter = 0;
 
+// cria um operando do tipo registrador
 iloc_operand_t *iloc_operand_new_reg(const char *name) {
     iloc_operand_t *operand = (iloc_operand_t *)malloc(sizeof(iloc_operand_t));
     if (operand == NULL) {
@@ -21,6 +22,7 @@ iloc_operand_t *iloc_operand_new_reg(const char *name) {
     return operand;
 }
 
+// cria um operando do tipo inteiro constante
 iloc_operand_t *iloc_operand_new_const(int value) {
     iloc_operand_t *operand = (iloc_operand_t *)malloc(sizeof(iloc_operand_t));
     if (operand == NULL) {
@@ -32,6 +34,7 @@ iloc_operand_t *iloc_operand_new_const(int value) {
     return operand;
 }
 
+// cria um operando do tipo label
 iloc_operand_t *iloc_operand_new_label(const char *name) {
     iloc_operand_t *operand = (iloc_operand_t *)malloc(sizeof(iloc_operand_t));
     if (operand == NULL) {
@@ -47,6 +50,7 @@ iloc_operand_t *iloc_operand_new_label(const char *name) {
     return operand;
 }
 
+// libera a memoria
 void iloc_operand_free(iloc_operand_t *operand) {
     if (operand == NULL) return;
     if (operand->type == OPERAND_REGISTER && operand->u.reg_name != NULL) {
@@ -58,6 +62,7 @@ void iloc_operand_free(iloc_operand_t *operand) {
     free(operand);
 }
 
+// cria uma nova instrução iloc
 iloc_op_t *iloc_op_new(const char *opcode, iloc_operand_t *src1, iloc_operand_t *src2, iloc_operand_t *dest1, iloc_operand_t *dest2, const char *label, const char *comment) {
     iloc_op_t *op = (iloc_op_t *)malloc(sizeof(iloc_op_t));
     if (op == NULL) {
@@ -79,6 +84,7 @@ iloc_op_t *iloc_op_new(const char *opcode, iloc_operand_t *src1, iloc_operand_t 
     return op;
 }
 
+// libera a isntrução inteira
 void iloc_op_free(iloc_op_t *op) {
     if (op == NULL) return;
     free(op->opcode);
@@ -91,6 +97,7 @@ void iloc_op_free(iloc_op_t *op) {
     free(op);
 }
 
+// cria uma lista de instruções iloc
 iloc_list_t *iloc_list_new() {
     iloc_list_t *list = (iloc_list_t *)malloc(sizeof(iloc_list_t));
     if (list == NULL) {
@@ -102,6 +109,7 @@ iloc_list_t *iloc_list_new() {
     return list;
 }
 
+// adiciona uma instrução na lista
 void iloc_list_add(iloc_list_t *list, iloc_op_t *op) {
     if (list == NULL || op == NULL) return;
     if (list->head == NULL) {
@@ -113,27 +121,25 @@ void iloc_list_add(iloc_list_t *list, iloc_op_t *op) {
     }
 }
 
+// concatena duas listas numa só
 void iloc_list_concat(iloc_list_t *list1, iloc_list_t *list2) {
     if (list1 == NULL || list2 == NULL) return;
 
-    // If list2 is not empty, append its operations to list1
     if (list2->head != NULL) {
         if (list1->head == NULL) {
-            // list1 was empty, it now becomes list2
             list1->head = list2->head;
             list1->tail = list2->tail;
         } else {
-            // Append list2 to list1
             list1->tail->next = list2->head;
             list1->tail = list2->tail;
         }
     }
-    
-    // Always free the container of list2, as its contents are now owned by list1.
-    // This fixes the leak for empty lists.
+
+    // pra consertar aquele leak de memoria
     free(list2);
 }
 
+// printa a lista
 void iloc_list_print(FILE *fp, iloc_list_t *list) {
     if (list == NULL || list->head == NULL) return;
     iloc_op_t *current = list->head;
@@ -143,7 +149,6 @@ void iloc_list_print(FILE *fp, iloc_list_t *list) {
         }
         fprintf(fp, "%s", current->opcode);
 
-        // Print source operands
         if (current->src1 != NULL) {
             fprintf(fp, " ");
             if (current->src1->type == OPERAND_REGISTER) fprintf(fp, "%s", current->src1->u.reg_name);
@@ -157,29 +162,25 @@ void iloc_list_print(FILE *fp, iloc_list_t *list) {
             else if (current->src2->type == OPERAND_LABEL) fprintf(fp, "%s", current->src2->u.label_name);
         }
 
-        // Determine separator based on operation type 
-        const char* separator = " =>"; // Default for most operations 
-        if (strcmp(current->opcode, "cbr") == 0 ||
+        const char* separator = " =>"; 
+        if (strcmp(current->opcode, "cbr") == 0 || // se for algum desvio, muda a setinha conforme o doc do sor
             strcmp(current->opcode, "jumpI") == 0 ||
             strcmp(current->opcode, "jump") == 0) {
-            separator = " ->"; // Control flow operations use "->" 
+            separator = " ->";
         }
 
-        // Print destination operands
         if (current->dest1 != NULL || current->dest2 != NULL) {
             fprintf(fp, "%s", separator);
             
-            // Special handling for storeAI and cstoreAI 
             if (strcmp(current->opcode, "storeAI") == 0 || strcmp(current->opcode, "cstoreAI") == 0) {
                 if (current->dest1 != NULL) {
                     fprintf(fp, " ");
                     if (current->dest1->type == OPERAND_REGISTER) fprintf(fp, "%s", current->dest1->u.reg_name);
-                    // storeAI's dest1 is a register 
                 }
                 if (current->dest2 != NULL && current->dest2->type == OPERAND_CONSTANT) {
-                    fprintf(fp, ", %d", current->dest2->u.value); // dest2 is the immediate constant 
+                    fprintf(fp, ", %d", current->dest2->u.value); 
                 }
-            } else if (strcmp(current->opcode, "cbr") == 0) { // cbr has two label destinations 
+            } else if (strcmp(current->opcode, "cbr") == 0) { 
                  if (current->dest1 != NULL) {
                     fprintf(fp, " ");
                     if (current->dest1->type == OPERAND_LABEL) fprintf(fp, "%s", current->dest1->u.label_name);
@@ -189,7 +190,7 @@ void iloc_list_print(FILE *fp, iloc_list_t *list) {
                     if (current->dest2->type == OPERAND_LABEL) fprintf(fp, "%s", current->dest2->u.label_name);
                 }
             }
-            else { // General case for other operations
+            else {
                 if (current->dest1 != NULL) {
                     fprintf(fp, " ");
                     if (current->dest1->type == OPERAND_REGISTER) fprintf(fp, "%s", current->dest1->u.reg_name);
@@ -206,13 +207,14 @@ void iloc_list_print(FILE *fp, iloc_list_t *list) {
         }
         
         if (current->comment != NULL) {
-            fprintf(fp, " // %s", current->comment);// [cite: 67]
+            fprintf(fp, " // %s", current->comment);
         }
         fprintf(fp, "\n");
         current = current->next;
     }
 }
 
+// libera a lista inteira
 void iloc_list_free(iloc_list_t *list) {
     if (list == NULL) return;
     iloc_op_t *current = list->head;
@@ -224,6 +226,7 @@ void iloc_list_free(iloc_list_t *list) {
     free(list);
 }
 
+// gera um novo label unico com o label_counter
 char *iloc_new_label() {
     char *label = (char *)malloc(20 * sizeof(char));
     if (label == NULL) {
@@ -234,6 +237,7 @@ char *iloc_new_label() {
     return label;
 }
 
+// gera um novo registrador unico com o reg_temp_counter
 char *iloc_new_reg_temp() {
     char *temp_reg = (char *)malloc(20 * sizeof(char));
     if (temp_reg == NULL) {

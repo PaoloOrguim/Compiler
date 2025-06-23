@@ -1,3 +1,79 @@
+foo: nop // Function entry
+loadI 0 => r0 // Load integer literal
+storeAI r0 => rfp, 16 // Store initial value for temp
+loadAI rfp, 16 => r1 // Load value of temp
+loadAI rfp, 4 => r2 // Load value of var
+loadAI rfp, 8 => r3 // Load value of bvar
+mult r2, r3 => r4 // Multiplication
+add r1, r4 => r5 // Addition
+storeAI r5 => rfp, 16 // Store value for temp
+loadAI rfp, 16 => r6 // Load value of temp
+loadAI rfp, 4 => r7 // Load value of var
+loadAI rfp, 8 => r8 // Load value of bvar
+mult r7, r8 => r9 // Multiplication
+cmp_EQ r6, r9 => r10 // EQ Cmp
+cbr r10 -> L0, L1 // Conditional branch (if-else)
+L0: nop // If block start
+loadAI rfp, 16 => r11 // Load value of temp
+loadI 1 => r12 // Load integer literal
+add r11, r12 => r13 // Addition
+storeAI r13 => rfp, 16 // Store value for temp
+jumpI -> L2 // Jump to end of if-else
+L1: nop // Else block start
+loadAI rfp, 16 => r14 // Load value of temp
+loadI 1 => r15 // Load integer literal
+rsubI r15, 0 => r16 // Unary minus
+mult r14, r16 => r17 // Multiplication
+storeAI r17 => rfp, 16 // Store value for temp
+L2: nop // End if-else label
+loadAI rfp, 16 => r18 // Load value of temp
+i2i r18 => r_ret // Set return value
 main: nop // Function entry
-loadI 5 => r0 // Load integer literal
-storeAI r0 => rbss, 8 // Store value for global
+loadI 0 => r19 // Load integer literal
+storeAI r19 => rfp, 4 // Store initial value for var
+loadI 5 => r20 // Load integer literal
+storeAI r20 => rfp, 8 // Store initial value for mine
+loadAI rfp, 4 => r21 // Load value of var
+loadI 5 => r22 // Load integer literal
+add r21, r22 => r23 // Addition
+storeAI r23 => rfp, 4 // Store value for var
+L3: nop // While loop start
+loadAI rfp, 4 => r24 // Load value of var
+loadI 0 => r25 // Load integer literal
+cmp_GT r24, r25 => r26 // GT Cmp
+cbr r26 -> L4, L5 // Conditional branch (while)
+L4: nop // While body start
+loadAI rfp, 4 => r27 // Load value of var
+loadAI rfp, 8 => r28 // Load value of mine
+loadAI rfp, 4 => r29 // Load value of var
+sub r28, r29 => r30 // Subtraction
+mult r27, r30 => r31 // Multiplication
+loadI 2 => r32 // Load integer literal
+mult r31, r32 => r33 // Multiplication
+storeAI r33 => rfp, 8 // Store value for mine
+loadAI rfp, 4 => r34 // Load value of var
+loadI 3 => r35 // Load integer literal
+sub r34, r35 => r36 // Subtraction
+storeAI r36 => rfp, 4 // Store value for var
+loadI 3 => r37 // Load integer literal
+loadAI rfp, 4 => r38 // Load value of var
+mult r37, r38 => r39 // Multiplication
+loadI 4 => r40 // Load integer literal
+rsubI r40, 0 => r41 // Unary minus
+sub r39, r41 => r42 // Subtraction
+storeAI r42 => rfp, 4 // Store value for var
+loadAI rfp, 4 => r43 // Load value of var
+xorI r43, 1 => r44 // Logical NOT
+loadI 3 => r45 // Load integer literal
+sub r44, r45 => r46 // Subtraction
+storeAI r46 => rfp, 4 // Store value for var
+loadAI rfp, 4 => r47 // Load value of var
+loadAI rfp, 8 => r48 // Load value of mine
+cmp_LE r47, r48 => r49 // LE Cmp
+storeAI r49 => rfp, 4 // Store value for var
+loadAI rfp, 4 => r50 // Load value of var
+storeAI r50 => rfp, 4 // Store value for var
+jumpI -> L3 // Jump to loop start
+L5: nop // While loop end
+loadAI rfp, 4 => r51 // Load value of var
+i2i r51 => r_ret // Set return value
