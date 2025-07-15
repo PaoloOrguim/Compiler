@@ -49,7 +49,7 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
     char current_func_name[256] = "";
 
     while (current_op != NULL) {
-        if (current_op->label != NULL && strcmp(current_op->opcode, "nop") != 0) {
+        if (current_op->label != NULL) {
             printf("%s:\n", current_op->label);
         }
 
@@ -118,9 +118,35 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
             int offsetA = get_temp_offset(current_op->src1->u.reg_name);
             int offsetB = get_temp_offset(current_op->src2->u.reg_name);
             int offsetC = get_temp_offset(current_op->dest1->u.reg_name);
+            
             printf("\tmovl -%d(%%rbp), %%eax\n", offsetA);
-            printf("\tcmpl -%d(%%rbp), %%eax\n", offsetB);
-            printf("\tset%s %%al\n", current_op->opcode + 4); 
+            printf("\tmovl -%d(%%rbp), %%edx\n", offsetB); // Usa edx para o segundo operando
+            printf("\tcmpl %%edx, %%eax\n");              // Compara eax com edx
+
+            // --- LÓGICA DE TRADUÇÃO CORRETA ---
+            const char *suffix = current_op->opcode + 4; // Pega o sufixo (ex: "LT", "EQ")
+            char set_instruction[32];
+
+            if (strcmp(suffix, "LT") == 0) {
+                strcpy(set_instruction, "setl");
+            } else if (strcmp(suffix, "LE") == 0) {
+                strcpy(set_instruction, "setle");
+            } else if (strcmp(suffix, "GT") == 0) {
+                strcpy(set_instruction, "setg");
+            } else if (strcmp(suffix, "GE") == 0) {
+                strcpy(set_instruction, "setge");
+            } else if (strcmp(suffix, "EQ") == 0) {
+                strcpy(set_instruction, "sete");
+            } else if (strcmp(suffix, "NE") == 0) {
+                strcpy(set_instruction, "setne");
+            } else {
+                // Fallback para caso encontre um opcode inesperado
+                strcpy(set_instruction, "nop # UNKNOWN_CMP"); 
+            }
+
+            printf("\t%s %%al\n", set_instruction);
+            // ------------------------------------
+
             printf("\tmovzbl %%al, %%eax\n");
             printf("\tmovl %%eax, -%d(%%rbp)\n", offsetC);
         }
