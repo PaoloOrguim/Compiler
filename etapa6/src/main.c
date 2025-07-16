@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "asd.h"
 #include "iloc.h"
-#include "asm.h" // Inclui o novo cabeçalho do assembly
+#include "asm.h"
 #include "tables.h"
 
 extern int yyparse(void);
@@ -15,15 +15,14 @@ int main (int argc, char **argv)
     int ret = yyparse();
     
     if (arvore != NULL) {
-        // Gera o código assembly em vez do ILOC ou do .dot (Etapa 6)
+        // Gerar assembly (Etapa 6)
         asm_generate(arvore->code, global_scope);
     }
 
-    // Libera toda a memória
     asd_free(arvore);
     arvore = NULL;
 
-    // CORREÇÃO: Agora main() é responsável por liberar a tabela global. (Etapa 6)
+    // (Etapa 6)
     free_table(global_scope); 
     global_scope = NULL; 
 

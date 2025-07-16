@@ -3,16 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Função auxiliar para obter o offset de um registrador temporário na pilha.
+// Obter o offset de um registardor temporario na pilha
 int get_temp_offset(const char *temp_reg) {
     if (temp_reg == NULL) return 0;
     return (atoi(temp_reg + 1) + 1) * 4;
 }
 
-// NOVA FUNÇÃO: Encontra o nome de uma variável global pelo seu offset.
+// Encontra o nome de variável global pelo offset
 const char* find_global_variable_by_offset(struct table *global_scope, int offset) {
     if (global_scope == NULL) {
-        return "unknown_global"; // Fallback
+        return "unknown_global";
     }
     for (int i = 0; i < global_scope->total_entries; i++) {
         struct entry *e = global_scope->entries[i];
@@ -20,14 +20,14 @@ const char* find_global_variable_by_offset(struct table *global_scope, int offse
             return e->value.token_val;
         }
     }
-    return "unknown_global_offset"; // Fallback se não encontrar
+    return "unknown_global_offset";
 }
 
 
 void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
     if (iloc_code == NULL) return;
 
-    // --- 1. Segmento de Dados (.data) ---
+    // Segmento de Dados (.data)
     printf("\t.data\n");
     if (global_scope != NULL) {
         for (int i = 0; i < global_scope->total_entries; i++) {
@@ -42,7 +42,7 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
     }
     printf("\n");
 
-    // --- 2. Segmento de Texto (.text) ---
+    // Segmento de Texto (.text)
     printf("\t.text\n");
 
     iloc_op_t *current_op = iloc_code->head;
@@ -70,7 +70,7 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
             if (strcmp(current_op->src1->u.reg_name, "rfp") == 0) {
                 printf("\tmovl -%d(%%rbp), %%eax\n", current_op->src2->u.value);
             } else { // "rbss"
-                // CORREÇÃO: Usa a função de busca para obter o nome real da variável.
+                // ajuste: Usa a função de busca para obter o nome real da variável
                 const char* var_name = find_global_variable_by_offset(global_scope, current_op->src2->u.value);
                 printf("\tmovl %s(%%rip), %%eax\n", var_name);
             }
@@ -83,7 +83,6 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
             if (strcmp(current_op->dest1->u.reg_name, "rfp") == 0) {
                 printf("\tmovl %%eax, -%d(%%rbp)\n", current_op->dest2->u.value);
             } else { // "rbss"
-                // CORREÇÃO: Usa a função de busca para obter o nome real da variável.
                 const char* var_name = find_global_variable_by_offset(global_scope, current_op->dest2->u.value);
                 printf("\tmovl %%eax, %s(%%rip)\n", var_name);
             }
@@ -123,8 +122,8 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
             printf("\tmovl -%d(%%rbp), %%edx\n", offsetB); // Usa edx para o segundo operando
             printf("\tcmpl %%edx, %%eax\n");              // Compara eax com edx
 
-            // --- LÓGICA DE TRADUÇÃO CORRETA ---
-            const char *suffix = current_op->opcode + 4; // Pega o sufixo (ex: "LT", "EQ")
+            // logica de traducao
+            const char *suffix = current_op->opcode + 4; // Pega o sufixo
             char set_instruction[32];
 
             if (strcmp(suffix, "LT") == 0) {
@@ -140,12 +139,10 @@ void asm_generate(iloc_list_t *iloc_code, struct table *global_scope) {
             } else if (strcmp(suffix, "NE") == 0) {
                 strcpy(set_instruction, "setne");
             } else {
-                // Fallback para caso encontre um opcode inesperado
                 strcpy(set_instruction, "nop # UNKNOWN_CMP"); 
             }
 
             printf("\t%s %%al\n", set_instruction);
-            // ------------------------------------
 
             printf("\tmovzbl %%al, %%eax\n");
             printf("\tmovl %%eax, -%d(%%rbp)\n", offsetC);

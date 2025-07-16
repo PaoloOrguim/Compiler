@@ -12,7 +12,7 @@
 
     extern asd_tree_t *arvore;   /* raiz da AST */
 
-    extern struct table *global_scope; // Variável externa para o escopo global (Etapa 6)
+    extern struct table *global_scope; // Variável pro escopo global (Etapa 6)
 
     struct table_stack *stack = NULL; // Pilha de tabelas
     int variable_type = 0; // Tipo da variavel
@@ -721,7 +721,7 @@ push_table:                                         {
                                                         struct table *table = create_table();
                                                         push_table_stack(&stack, table);
 
-                                                        // FIX: Capture global scope (Etapa 6)
+                                                        // Pegar o escopo gloal (Etapa 6)
                                                         if (global_scope == NULL) {
                                                             global_scope = stack->top;
                                                         }
